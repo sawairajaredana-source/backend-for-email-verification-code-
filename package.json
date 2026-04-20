@@ -1,0 +1,17 @@
+{
+  "name": "getxh-email-verification",
+  "version": "1.0.0",
+  "description": "Email verification backend for GETXH using SendGrid",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "firebase-admin": "^13.8.0",
+    "nodemailer": "^8.0.5"
+  }
+}
