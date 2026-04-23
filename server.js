@@ -11,19 +11,36 @@ dotenv.config();
 // ── Firebase Admin init ──────────────────────────────────────────────────────
 let serviceAccount = null;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-} else {
+  try {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    serviceAccount = JSON.parse(raw);
+    // Fix broken newlines in private_key (Render sometimes strips \n)
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
+    console.log("Firebase: loaded from env var");
+  } catch (e) {
+    console.error("Firebase: failed to parse FIREBASE_SERVICE_ACCOUNT env var:", e.message);
+  }
+}
+
+if (!serviceAccount) {
   try {
     serviceAccount = JSON.parse(readFileSync("./firebase-service-account.json", "utf8"));
     console.log("Firebase: loaded from file");
   } catch (e) {
-    console.warn("Firebase: service account not found, Admin SDK disabled");
+    console.error("Firebase: service account not found anywhere — Admin SDK disabled");
   }
 }
 
 if (serviceAccount) {
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  console.log("Firebase Admin initialized");
+  try {
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    console.log("Firebase Admin initialized ✓");
+  } catch (e) {
+    console.error("Firebase Admin init failed:", e.message);
+    serviceAccount = null;
+  }
 }
 
 // ── Express setup ────────────────────────────────────────────────────────────
@@ -56,7 +73,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v6-fixed" });
+  res.json({ status: "running", version: "v7-firebase-fix", firebaseReady: !!serviceAccount });
 });
 
 app.post("/check-email", async (req, res) => {
