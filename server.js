@@ -10,9 +10,10 @@ dotenv.config();
 
 // ── Firebase Admin init ──────────────────────────────────────────────────────
 let serviceAccount = null;
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+const _saRaw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_KEY;
+if (_saRaw) {
   try {
-    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const raw = _saRaw;
     serviceAccount = JSON.parse(raw);
     // Fix broken newlines in private_key (Render sometimes strips \n)
     if (serviceAccount.private_key) {
@@ -73,7 +74,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v13", keyId: serviceAccount?.private_key_id || "none" });
+  res.json({ status: "running", version: "v14-keyfix", keyId: serviceAccount?.private_key_id || "none" });
 });
 
 app.post("/check-email", async (req, res) => {
