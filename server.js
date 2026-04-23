@@ -32,9 +32,21 @@ app.post("/check-email", async (req, res) => {
   }
 });
 
-// Firebase Admin — only for Auth (not Firestore)
+// Firebase Admin — env var se ya file se
+import { readFileSync } from "fs";
+
+let serviceAccount = null;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  try {
+    serviceAccount = JSON.parse(readFileSync("./firebase-service-account.json", "utf8"));
+  } catch (e) {
+    console.warn("firebase-service-account.json not found, Admin SDK disabled");
+  }
+}
+
+if (serviceAccount) {
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
 
