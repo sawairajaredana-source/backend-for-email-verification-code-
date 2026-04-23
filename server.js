@@ -73,7 +73,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v10-debug", hasApiKey: !!process.env.FIREBASE_API_KEY });
+  res.json({ status: "running", version: "v11-final" });
 });
 
 app.post("/check-email", async (req, res) => {
@@ -81,13 +81,14 @@ app.post("/check-email", async (req, res) => {
   if (!email) return res.status(400).json({ success: false, message: "Email required." });
 
   try {
+    const apiKey = process.env.FIREBASE_API_KEY || "AIzaSyClO8clBVgSHKx8jarNwC38oMtWRK0W8KE";
     const fbRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:fetchSignInMethodsForEmail?key=${process.env.FIREBASE_API_KEY}`,
+      `https://identitytoolkit.googleapis.com/v1/accounts:fetchSignInMethodsForEmail?key=${apiKey}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: email, continueUri: "http://localhost" }) }
     );
     const data = await fbRes.json();
     const registered = Array.isArray(data.signinMethods) && data.signinMethods.length > 0;
-    return res.json({ success: true, registered, _debug: data });
+    return res.json({ success: true, registered });
   } catch (err) {
     console.warn("check-email error:", err.message);
     return res.status(500).json({ success: false, message: "Cannot check email. Try again.", _err: err.message });
@@ -101,8 +102,9 @@ app.post("/send-otp", async (req, res) => {
 
   if (type === "reset") {
     try {
+      const apiKey = process.env.FIREBASE_API_KEY || "AIzaSyClO8clBVgSHKx8jarNwC38oMtWRK0W8KE";
       const fbRes = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:fetchSignInMethodsForEmail?key=${process.env.FIREBASE_API_KEY}`,
+        `https://identitytoolkit.googleapis.com/v1/accounts:fetchSignInMethodsForEmail?key=${apiKey}`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: email, continueUri: "http://localhost" }) }
       );
       const data = await fbRes.json();
