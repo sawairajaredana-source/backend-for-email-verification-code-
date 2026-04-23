@@ -74,7 +74,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v15", keyId: serviceAccount?.private_key_id || "none" });
+  res.json({ status: "running", version: "v16", keyId: serviceAccount?.private_key_id || "none" });
 });
 
 app.post("/check-email", async (req, res) => {
@@ -88,7 +88,7 @@ app.post("/check-email", async (req, res) => {
     if (err.code === "auth/user-not-found") {
       return res.json({ success: true, registered: false });
     }
-    return res.status(500).json({ success: false, message: "Cannot check email. Try again." });
+    return res.status(500).json({ success: false, message: "Cannot check email. Try again.", errorCode: err.code, errorMsg: err.message });
   }
 });
 
