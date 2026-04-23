@@ -57,7 +57,7 @@ const transporter = nodemailer.createTransport({
   port:   587,
   secure: false,
   auth: {
-    user: process.env.BREVO_USER,
+    user: decodeURIComponent(process.env.BREVO_USER || ""),
     pass: process.env.BREVO_PASS,
   },
 });
@@ -74,7 +74,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v14-keyfix", keyId: serviceAccount?.private_key_id || "none" });
+  res.json({ status: "running", version: "v15", keyId: serviceAccount?.private_key_id || "none" });
 });
 
 app.post("/check-email", async (req, res) => {
