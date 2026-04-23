@@ -73,7 +73,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v9-rest-api" });
+  res.json({ status: "running", version: "v10-debug", hasApiKey: !!process.env.FIREBASE_API_KEY });
 });
 
 app.post("/check-email", async (req, res) => {
@@ -87,10 +87,10 @@ app.post("/check-email", async (req, res) => {
     );
     const data = await fbRes.json();
     const registered = Array.isArray(data.signinMethods) && data.signinMethods.length > 0;
-    return res.json({ success: true, registered });
+    return res.json({ success: true, registered, _debug: data });
   } catch (err) {
     console.warn("check-email error:", err.message);
-    return res.status(500).json({ success: false, message: "Cannot check email. Try again." });
+    return res.status(500).json({ success: false, message: "Cannot check email. Try again.", _err: err.message });
   }
 });
 
