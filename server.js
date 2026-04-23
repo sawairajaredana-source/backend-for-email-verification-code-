@@ -11,6 +11,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.json({ status: "running", version: "v2-template-fix" });
+});
+
 if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
   throw new Error("FIREBASE_SERVICE_ACCOUNT env variable is missing.");
 }
@@ -55,6 +59,7 @@ async function sendOTPEmail(email, otp, type) {
 
 async function handleSendOtp(req, res) {
   const { email, type } = req.body;
+  console.log("send-otp called → email:", email, "| type:", type);
 
   if (!email) {
     return res.status(400).json({ success: false, message: "Email is required." });
