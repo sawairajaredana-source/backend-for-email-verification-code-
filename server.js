@@ -12,7 +12,24 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v4-reset-password" });
+  res.json({ status: "running", version: "v5-check-email" });
+});
+
+app.post("/check-email", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ success: false, message: "Email required." });
+
+  try {
+    await admin.auth().getUserByEmail(email);
+    return res.json({ success: true, registered: true });
+  } catch (err) {
+    if (err.code === "auth/user-not-found") {
+      return res.json({ success: true, registered: false });
+    }
+    // Firebase Admin not initialized — allow to proceed
+    console.warn("check-email admin error:", err.code, err.message);
+    return res.json({ success: true, registered: true });
+  }
 });
 
 // Firebase Admin — only for Auth (not Firestore)
