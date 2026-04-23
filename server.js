@@ -71,7 +71,7 @@ app.post("/check-email", async (req, res) => {
       return res.json({ success: true, registered: false });
     }
     console.warn("check-email error:", err.code, err.message);
-    return res.json({ success: true, registered: true });
+    return res.status(500).json({ success: false, message: "Cannot check email. Try again." });
   }
 });
 
