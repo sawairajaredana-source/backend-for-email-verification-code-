@@ -80,6 +80,14 @@ app.post("/send-otp", async (req, res) => {
   console.log("send-otp → email:", email, "| type:", type);
   if (!email) return res.status(400).json({ success: false, message: "Email is required." });
 
+  if (type === "reset") {
+    try {
+      await admin.auth().getUserByEmail(email);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: "Please enter a registered email." });
+    }
+  }
+
   const otp = generateOTP();
   otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000, type: type || "signup" };
 
@@ -153,6 +161,30 @@ app.post("/update-password", async (req, res) => {
   } catch (error) {
     console.error("Update password error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to update password.", error: error.message });
+  }
+});
+
+app.post("/reset-password", async (req, res) => {
+  const { email, newPassword } = req.body;
+  console.log("reset-password → email:", email);
+
+  if (!email || !newPassword) return res.status(400).json({ success: false, message: "Email and password required." });
+
+  if (!verifiedResets[email] || Date.now() > verifiedResets[email]) {
+    delete verifiedResets[email];
+    return res.status(403).json({ success: false, message: "Session expired. Please start again." });
+  }
+
+  if (newPassword.length < 8) return res.status(400).json({ success: false, message: "Password must be at least 8 characters." });
+
+  try {
+    const user = await admin.auth().getUserByEmail(email);
+    await admin.auth().updateUser(user.uid, { password: newPassword });
+    delete verifiedResets[email];
+    return res.status(200).json({ success: true, message: "Password updated successfully." });
+  } catch (error) {
+    console.error("Reset password error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to reset password." });
   }
 });
 
