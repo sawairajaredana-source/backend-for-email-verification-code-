@@ -73,7 +73,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v8-debug", firebaseReady: !!serviceAccount });
+  res.json({ status: "running", version: "v9-rest-api" });
 });
 
 app.post("/check-email", async (req, res) => {
@@ -81,14 +81,16 @@ app.post("/check-email", async (req, res) => {
   if (!email) return res.status(400).json({ success: false, message: "Email required." });
 
   try {
-    await admin.auth().getUserByEmail(email);
-    return res.json({ success: true, registered: true });
+    const fbRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:fetchSignInMethodsForEmail?key=${process.env.FIREBASE_API_KEY}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: email, continueUri: "http://localhost" }) }
+    );
+    const data = await fbRes.json();
+    const registered = Array.isArray(data.signinMethods) && data.signinMethods.length > 0;
+    return res.json({ success: true, registered });
   } catch (err) {
-    if (err.code === "auth/user-not-found") {
-      return res.json({ success: true, registered: false });
-    }
-    console.warn("check-email error:", err.code, err.message);
-    return res.status(500).json({ success: false, message: "Cannot check email. Try again.", errorCode: err.code, errorMsg: err.message });
+    console.warn("check-email error:", err.message);
+    return res.status(500).json({ success: false, message: "Cannot check email. Try again." });
   }
 });
 
@@ -99,9 +101,15 @@ app.post("/send-otp", async (req, res) => {
 
   if (type === "reset") {
     try {
-      await admin.auth().getUserByEmail(email);
+      const fbRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:fetchSignInMethodsForEmail?key=${process.env.FIREBASE_API_KEY}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier: email, continueUri: "http://localhost" }) }
+      );
+      const data = await fbRes.json();
+      const registered = Array.isArray(data.signinMethods) && data.signinMethods.length > 0;
+      if (!registered) return res.status(400).json({ success: false, message: "Please enter a registered email." });
     } catch (err) {
-      return res.status(400).json({ success: false, message: "Please enter a registered email." });
+      return res.status(500).json({ success: false, message: "Cannot verify email. Try again." });
     }
   }
 
