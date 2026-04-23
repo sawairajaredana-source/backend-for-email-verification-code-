@@ -73,7 +73,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v7-firebase-fix", firebaseReady: !!serviceAccount });
+  res.json({ status: "running", version: "v8-debug", firebaseReady: !!serviceAccount });
 });
 
 app.post("/check-email", async (req, res) => {
