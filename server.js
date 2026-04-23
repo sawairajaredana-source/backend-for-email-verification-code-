@@ -63,6 +63,15 @@ app.post("/send-otp", async (req, res) => {
     return res.status(400).json({ success: false, message: "Email is required." });
   }
 
+  // For password reset: verify email is registered in Firebase Auth
+  if (type === "reset") {
+    try {
+      await admin.auth().getUserByEmail(email);
+    } catch (err) {
+      return res.status(404).json({ success: false, message: "No account found with this email. Please enter a registered email." });
+    }
+  }
+
   const otp = generateOTP();
   otpStore[email] = { otp, expiry: Date.now() + 5 * 60 * 1000, type: type || "signup" };
 
