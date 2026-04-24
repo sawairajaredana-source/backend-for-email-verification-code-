@@ -4,7 +4,7 @@ import nodemailer from "nodemailer";
 import dotenv     from "dotenv";
 import admin      from "firebase-admin";
 import { readFileSync } from "fs";
-import { createSign } from "crypto";
+import { createSign, createHash } from "crypto";
 import { getVerifyEmailTemplate, getResetPasswordTemplate } from "./emailTemplate.js";
 
 dotenv.config();
@@ -83,7 +83,8 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v20", keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
+  const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
+  res.json({ status: "running", version: "v21", pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
 });
 
 app.get("/test-jwt", async (req, res) => {
