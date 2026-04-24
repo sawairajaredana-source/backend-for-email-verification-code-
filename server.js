@@ -3,7 +3,7 @@ import cors       from "cors";
 import nodemailer from "nodemailer";
 import dotenv     from "dotenv";
 import admin      from "firebase-admin";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { createSign, createHash } from "crypto";
 import { getVerifyEmailTemplate, getResetPasswordTemplate } from "./emailTemplate.js";
 
@@ -39,14 +39,11 @@ if (!serviceAccount) {
 
 if (serviceAccount) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId:   serviceAccount.project_id,
-        clientEmail: serviceAccount.client_email,
-        privateKey:  serviceAccount.private_key,
-      })
-    });
-    console.log("Firebase Admin initialized ✓");
+    const tmpPath = "/tmp/firebase-sa.json";
+    writeFileSync(tmpPath, JSON.stringify(serviceAccount));
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = tmpPath;
+    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    console.log("Firebase Admin initialized via ADC ✓");
   } catch (e) {
     console.error("Firebase Admin init failed:", e.message);
     serviceAccount = null;
@@ -84,7 +81,7 @@ async function sendOTPEmail(email, otp, type) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
-  res.json({ status: "running", version: "v24", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
+  res.json({ status: "running", version: "v25", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
 });
 
 app.get("/test-jwt", async (req, res) => {
