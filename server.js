@@ -38,7 +38,13 @@ if (!serviceAccount) {
 
 if (serviceAccount) {
   try {
-    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId:   serviceAccount.project_id,
+        clientEmail: serviceAccount.client_email,
+        privateKey:  serviceAccount.private_key,
+      })
+    });
     console.log("Firebase Admin initialized ✓");
   } catch (e) {
     console.error("Firebase Admin init failed:", e.message);
@@ -76,7 +82,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v18", keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
+  res.json({ status: "running", version: "v19", keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
 });
 
 app.post("/check-email", async (req, res) => {
