@@ -10,18 +10,20 @@ dotenv.config();
 
 // ── Firebase Admin init ──────────────────────────────────────────────────────
 let serviceAccount = null;
-const _saRaw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_KEY;
+const _saRaw = process.env.FIREBASE_SERVICE_ACCOUNT_B64
+  || process.env.FIREBASE_SERVICE_ACCOUNT
+  || process.env.FIREBASE_SERVICE_KEY;
 if (_saRaw) {
   try {
-    const raw = _saRaw;
+    const isB64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64 ? true : false;
+    const raw = isB64 ? Buffer.from(_saRaw, "base64").toString("utf8") : _saRaw;
     serviceAccount = JSON.parse(raw);
-    // Fix broken newlines in private_key (Render sometimes strips \n)
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
     }
-    console.log("Firebase: loaded from env var");
+    console.log("Firebase: loaded from env var" + (isB64 ? " (base64)" : ""));
   } catch (e) {
-    console.error("Firebase: failed to parse FIREBASE_SERVICE_ACCOUNT env var:", e.message);
+    console.error("Firebase: failed to parse service account env var:", e.message);
   }
 }
 
@@ -74,7 +76,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v16", keyId: serviceAccount?.private_key_id || "none" });
+  res.json({ status: "running", version: "v17", keyId: serviceAccount?.private_key_id || "none" });
 });
 
 app.post("/check-email", async (req, res) => {
