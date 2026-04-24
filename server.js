@@ -76,7 +76,7 @@ async function sendOTPEmail(email, otp, type) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "running", version: "v17", keyId: serviceAccount?.private_key_id || "none" });
+  res.json({ status: "running", version: "v18", keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
 });
 
 app.post("/check-email", async (req, res) => {
