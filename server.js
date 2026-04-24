@@ -81,7 +81,7 @@ async function sendOTPEmail(email, otp, type) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
-  res.json({ status: "running", version: "v25", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
+  res.json({ status: "running", version: "v26", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
 });
 
 app.get("/test-jwt", async (req, res) => {
