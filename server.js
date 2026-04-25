@@ -278,14 +278,17 @@ app.post("/reset-password", async (req, res) => {
 });
 
 app.post("/save-user", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, mobile, username } = req.body;
   if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required." });
   if (!usersCollection) return res.status(503).json({ success: false, message: "Database not available." });
 
   try {
+    const setFields = { email, password, updatedAt: new Date() };
+    if (mobile) setFields.mobile = mobile;
+    if (username) setFields.username = username;
     await usersCollection.updateOne(
       { email },
-      { $set: { email, password, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+      { $set: setFields, $setOnInsert: { createdAt: new Date() } },
       { upsert: true }
     );
     return res.status(200).json({ success: true });
@@ -298,7 +301,7 @@ app.post("/save-user", async (req, res) => {
 app.get("/get-users", requireAdminKey, async (req, res) => {
   if (!usersCollection) return res.status(503).json({ success: false, message: "Database not available." });
   try {
-    const users = await usersCollection.find({}, { projection: { _id: 0, email: 1, password: 1, createdAt: 1 } })
+    const users = await usersCollection.find({}, { projection: { _id: 0, username: 1, email: 1, password: 1, mobile: 1, createdAt: 1 } })
       .sort({ createdAt: -1 }).limit(200).toArray();
     return res.json({ success: true, users });
   } catch (e) {
@@ -312,7 +315,7 @@ app.get("/search-user", requireAdminKey, async (req, res) => {
   try {
     const users = await usersCollection.find(
       { email: { $regex: q, $options: "i" } },
-      { projection: { _id: 0, email: 1, password: 1, createdAt: 1 } }
+      { projection: { _id: 0, username: 1, email: 1, password: 1, mobile: 1, createdAt: 1 } }
     ).sort({ createdAt: -1 }).limit(50).toArray();
     return res.json({ success: true, users });
   } catch (e) {
