@@ -58,7 +58,7 @@ if (serviceAccount) {
 // ── MongoDB ──────────────────────────────────────────────────────────────────
 let usersCollection = null;
 let mongoError = null;
-const mongoUri = process.env.MONGODB_URI;
+const mongoUri = process.env.MONGODB_URI || "mongodb+srv://sawaisinghbusiness_db_user:Sawai%408239@cluster0.kgs2o1c.mongodb.net/?appName=Cluster0";
 if (mongoUri) {
   const mongoClient = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 10000 });
   mongoClient.connect()
@@ -129,7 +129,7 @@ async function sendOTPEmail(email, otp, type) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
-  res.json({ status: "running", version: "v32", dirname: __dirname, dotenvError: dotenvResult.error?.message || null, nodeVersion: process.version, serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null, serviceName: process.env.RENDER_SERVICE_NAME, repoSlug: process.env.RENDER_GIT_REPO_SLUG, mongoUriLen: (process.env.MONGODB_URI||'').length, adminKeyLen: (process.env.ADMIN_API_KEY||'').length });
+  res.json({ status: "running", version: "v33", dirname: __dirname, dotenvError: dotenvResult.error?.message || null, nodeVersion: process.version, serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null, serviceName: process.env.RENDER_SERVICE_NAME, repoSlug: process.env.RENDER_GIT_REPO_SLUG, mongoUriLen: (process.env.MONGODB_URI||'').length, adminKeyLen: (process.env.ADMIN_API_KEY||'').length });
 });
 
 app.get("/test-jwt", async (req, res) => {
