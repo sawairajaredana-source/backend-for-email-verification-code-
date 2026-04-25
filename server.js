@@ -125,7 +125,8 @@ async function sendOTPEmail(email, otp, type) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
-  res.json({ status: "running", version: "v27", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null });
+  const envKeys = Object.keys(process.env).filter(k => !['FIREBASE_SERVICE_ACCOUNT','FIREBASE_SERVICE_ACCOUNT_B64','BREVO_PASS','BREVO_USER'].includes(k));
+  res.json({ status: "running", version: "v28", nodeVersion: process.version, serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null, envKeys });
 });
 
 app.get("/test-jwt", async (req, res) => {
