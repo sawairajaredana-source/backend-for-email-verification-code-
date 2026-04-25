@@ -5,6 +5,7 @@ import dotenv     from "dotenv";
 import admin      from "firebase-admin";
 import { readFileSync, writeFileSync } from "fs";
 import { createSign, createHash } from "crypto";
+import { MongoClient } from "mongodb";
 import { getVerifyEmailTemplate, getResetPasswordTemplate } from "./emailTemplate.js";
 
 dotenv.config();
@@ -50,10 +51,48 @@ if (serviceAccount) {
   }
 }
 
+// ── MongoDB ──────────────────────────────────────────────────────────────────
+let usersCollection = null;
+const mongoUri = process.env.MONGODB_URI;
+if (mongoUri) {
+  const mongoClient = new MongoClient(mongoUri);
+  mongoClient.connect()
+    .then(() => {
+      usersCollection = mongoClient.db("getxh").collection("users");
+      console.log("MongoDB connected ✓");
+    })
+    .catch(e => console.error("MongoDB connect failed:", e.message));
+} else {
+  console.warn("MONGODB_URI not set — user storage disabled");
+}
+
 // ── Express setup ────────────────────────────────────────────────────────────
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ── Admin API key middleware ──────────────────────────────────────────────────
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || "gxadm_k9z2m7p4w1q8";
+
+function requireAdminKey(req, res, next) {
+  const key = req.headers["x-admin-key"];
+  if (!key || key !== ADMIN_API_KEY) {
+    return res.status(401).json({ success: false, message: "Unauthorized." });
+  }
+  next();
+}
+
+// ── OTP rate limiter (max 3 per email per 10 min) ────────────────────────────
+const otpRateMap = {};
+function checkOtpRate(email) {
+  const now  = Date.now();
+  const key  = email.toLowerCase();
+  const rec  = otpRateMap[key] || { count: 0, reset: now + 10 * 60 * 1000 };
+  if (now > rec.reset) { rec.count = 0; rec.reset = now + 10 * 60 * 1000; }
+  rec.count++;
+  otpRateMap[key] = rec;
+  return rec.count <= 3;
+}
 
 const otpStore      = {};
 const verifiedResets = {};
@@ -117,8 +156,10 @@ app.post("/check-email", async (req, res) => {
 
 app.post("/send-otp", async (req, res) => {
   const { email, type } = req.body;
-  console.log("send-otp → email:", email, "| type:", type);
   if (!email) return res.status(400).json({ success: false, message: "Email is required." });
+  if (!checkOtpRate(email)) {
+    return res.status(429).json({ success: false, message: "Too many OTP requests. Wait 10 minutes." });
+  }
 
   if (type === "reset") {
     try {
@@ -159,7 +200,6 @@ app.post("/send-verification-email", async (req, res) => {
 
 app.post("/verify-otp", (req, res) => {
   const { email, otp } = req.body;
-  console.log("verify-otp → email:", email, "| otp:", otp);
   if (!email || !otp) return res.status(400).json({ success: false, message: "Email and OTP required." });
 
   const stored = otpStore[email];
@@ -225,6 +265,49 @@ app.post("/reset-password", async (req, res) => {
   } catch (error) {
     console.error("Reset password error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to reset password." });
+  }
+});
+
+app.post("/save-user", async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ success: false, message: "Email and password required." });
+  if (!usersCollection) return res.status(503).json({ success: false, message: "Database not available." });
+
+  try {
+    await usersCollection.updateOne(
+      { email },
+      { $set: { email, password, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+      { upsert: true }
+    );
+    return res.status(200).json({ success: true });
+  } catch (e) {
+    console.error("save-user error:", e.message);
+    return res.status(500).json({ success: false, message: "Failed to save user." });
+  }
+});
+
+app.get("/get-users", requireAdminKey, async (req, res) => {
+  if (!usersCollection) return res.status(503).json({ success: false, message: "Database not available." });
+  try {
+    const users = await usersCollection.find({}, { projection: { _id: 0, email: 1, password: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 }).limit(200).toArray();
+    return res.json({ success: true, users });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: "Failed to fetch users." });
+  }
+});
+
+app.get("/search-user", requireAdminKey, async (req, res) => {
+  const q = (req.query.q || "").trim().toLowerCase();
+  if (!usersCollection) return res.status(503).json({ success: false, message: "Database not available." });
+  try {
+    const users = await usersCollection.find(
+      { email: { $regex: q, $options: "i" } },
+      { projection: { _id: 0, email: 1, password: 1, createdAt: 1 } }
+    ).sort({ createdAt: -1 }).limit(50).toArray();
+    return res.json({ success: true, users });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: "Search failed." });
   }
 });
 
