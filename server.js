@@ -6,9 +6,13 @@ import admin      from "firebase-admin";
 import { readFileSync, writeFileSync } from "fs";
 import { createSign, createHash } from "crypto";
 import { MongoClient } from "mongodb";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import { getVerifyEmailTemplate, getResetPasswordTemplate } from "./emailTemplate.js";
 
-dotenv.config();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const dotenvResult = dotenv.config({ path: join(__dirname, ".env") });
+console.log("dotenv path:", join(__dirname, ".env"), "| error:", dotenvResult.error?.message || "none");
 
 // ── Firebase Admin init ──────────────────────────────────────────────────────
 let serviceAccount = null;
@@ -125,7 +129,7 @@ async function sendOTPEmail(email, otp, type) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
-  res.json({ status: "running", version: "v30", nodeVersion: process.version, serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null, serviceName: process.env.RENDER_SERVICE_NAME, repoSlug: process.env.RENDER_GIT_REPO_SLUG, mongoUriLen: (process.env.MONGODB_URI||'').length, adminKeyLen: (process.env.ADMIN_API_KEY||'').length });
+  res.json({ status: "running", version: "v31", dirname: __dirname, nodeVersion: process.version, serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null, serviceName: process.env.RENDER_SERVICE_NAME, repoSlug: process.env.RENDER_GIT_REPO_SLUG, mongoUriLen: (process.env.MONGODB_URI||'').length, adminKeyLen: (process.env.ADMIN_API_KEY||'').length });
 });
 
 app.get("/test-jwt", async (req, res) => {
