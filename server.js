@@ -53,16 +53,21 @@ if (serviceAccount) {
 
 // ── MongoDB ──────────────────────────────────────────────────────────────────
 let usersCollection = null;
+let mongoError = null;
 const mongoUri = process.env.MONGODB_URI;
 if (mongoUri) {
-  const mongoClient = new MongoClient(mongoUri);
+  const mongoClient = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 10000 });
   mongoClient.connect()
     .then(() => {
       usersCollection = mongoClient.db("getxh").collection("users");
       console.log("MongoDB connected ✓");
     })
-    .catch(e => console.error("MongoDB connect failed:", e.message));
+    .catch(e => {
+      mongoError = e.message;
+      console.error("MongoDB connect failed:", e.message);
+    });
 } else {
+  mongoError = "MONGODB_URI not set";
   console.warn("MONGODB_URI not set — user storage disabled");
 }
 
@@ -120,7 +125,7 @@ async function sendOTPEmail(email, otp, type) {
 // ── Routes ───────────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   const pkHash = serviceAccount?.private_key ? createHash("md5").update(serviceAccount.private_key).digest("hex") : "none";
-  res.json({ status: "running", version: "v26", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString() });
+  res.json({ status: "running", version: "v27", nodeVersion: process.version, pkHash, pkLen: serviceAccount?.private_key?.length || 0, keyId: serviceAccount?.private_key_id || "none", serverTime: new Date().toISOString(), mongoConnected: !!usersCollection, mongoError: mongoError || null });
 });
 
 app.get("/test-jwt", async (req, res) => {
