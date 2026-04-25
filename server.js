@@ -57,6 +57,7 @@ if (serviceAccount) {
 
 // ── MongoDB ──────────────────────────────────────────────────────────────────
 let usersCollection = null;
+let paymentsCollection = null;
 let mongoError = null;
 const mongoUri = process.env.MONGODB_URI || "mongodb+srv://sawaisinghbusiness_db_user:Sawai%408239@cluster0.kgs2o1c.mongodb.net/?appName=Cluster0";
 if (mongoUri) {
@@ -64,6 +65,7 @@ if (mongoUri) {
   mongoClient.connect()
     .then(() => {
       usersCollection = mongoClient.db("getxh").collection("users");
+      paymentsCollection = mongoClient.db("getxh").collection("payments");
       console.log("MongoDB connected ✓");
     })
     .catch(e => {
@@ -320,6 +322,139 @@ app.get("/search-user", requireAdminKey, async (req, res) => {
     return res.json({ success: true, users });
   } catch (e) {
     return res.status(500).json({ success: false, message: "Search failed." });
+  }
+});
+
+// ── Get transactions ─────────────────────────────────────────────────────────
+app.get("/get-transactions", async (req, res) => {
+  const email = (req.query.email || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ success: false, message: "Email required." });
+  if (!paymentsCollection) return res.status(503).json({ success: false, message: "DB unavailable." });
+  try {
+    const transactions = await paymentsCollection
+      .find({ email }, { projection: { _id: 0, payment_id: 1, amount: 1, status: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 }).limit(20).toArray();
+    return res.json({ success: true, transactions });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: "Failed to fetch transactions." });
+  }
+});
+
+// ── Zerotize config ─────────────────────────────────────────────────────────
+const ZEROTIZE_ACCOUNT_ID = process.env.ZEROTIZE_ACCOUNT_ID || "7N96mSZj";
+const ZEROTIZE_SECRET_KEY  = process.env.ZEROTIZE_SECRET_KEY  || "opEucBuDJC4PmvSJ";
+
+// ── Get wallet balance ───────────────────────────────────────────────────────
+app.get("/get-balance", async (req, res) => {
+  const email = (req.query.email || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ success: false, message: "Email required." });
+  if (!usersCollection) return res.status(503).json({ success: false, message: "DB unavailable." });
+  try {
+    const user = await usersCollection.findOne({ email }, { projection: { walletBalance: 1 } });
+    return res.json({ success: true, balance: user?.walletBalance || 0 });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: "Failed to fetch balance." });
+  }
+});
+
+// ── Create payment ───────────────────────────────────────────────────────────
+app.post("/create-payment", async (req, res) => {
+  const { amount, email, name, phone } = req.body;
+  if (!amount || !email) return res.status(400).json({ success: false, message: "Amount and email required." });
+  if (amount < 10 || amount > 100000) return res.status(400).json({ success: false, message: "Amount must be ₹10–₹1,00,000." });
+  if (!ZEROTIZE_ACCOUNT_ID || !ZEROTIZE_SECRET_KEY) return res.status(500).json({ success: false, message: "Payment gateway not configured." });
+
+  const payment_id = `gxpay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  try {
+    const zpRes = await fetch("https://zerotize.in/api_payment_init", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        init_payment: {
+          account_id:      ZEROTIZE_ACCOUNT_ID,
+          secret_key:      ZEROTIZE_SECRET_KEY,
+          payment_id,
+          payment_amount:  amount,
+          payment_name:    name || "",
+          payment_email:   email,
+          payment_phone:   phone || "",
+          payment_purpose: "GETXH Wallet Recharge",
+          redirect_url:    "https://getxh.in/payment-success.html"
+        }
+      })
+    });
+
+    const zpData = await zpRes.json();
+    const isOk = zpData?.query === "Success"
+              && zpData?.response?.status === "Success"
+              && zpData?.response?.code == 200;
+
+    if (!isOk || !zpData?.response?.payment_link) {
+      console.error("Zerotize error:", zpData);
+      return res.status(502).json({ success: false, message: "Payment gateway error.", detail: zpData });
+    }
+
+    // Store payment record
+    if (paymentsCollection) {
+      await paymentsCollection.insertOne({
+        payment_id,
+        email: email.toLowerCase(),
+        amount: Number(amount),
+        status: "pending",
+        createdAt: new Date()
+      });
+    }
+
+    return res.json({ success: true, payment_url: zpData.response.payment_link, payment_id });
+  } catch (e) {
+    console.error("create-payment error:", e.message);
+    return res.status(500).json({ success: false, message: "Failed to create payment.", error: e.message });
+  }
+});
+
+// ── Verify payment ───────────────────────────────────────────────────────────
+app.post("/verify-payment", async (req, res) => {
+  const { payment_id } = req.body;
+  if (!payment_id) return res.status(400).json({ success: false, message: "payment_id required." });
+  if (!ZEROTIZE_ACCOUNT_ID || !ZEROTIZE_SECRET_KEY) return res.status(500).json({ success: false, message: "Payment gateway not configured." });
+
+  try {
+    const zpRes = await fetch("https://zerotize.in/api_payment_status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fetch_payment: {
+          account_id: ZEROTIZE_ACCOUNT_ID,
+          secret_key:  ZEROTIZE_SECRET_KEY,
+          payment_id
+        }
+      })
+    });
+
+    const zpData = await zpRes.json();
+    const status = (zpData?.payment_status || "pending").toLowerCase();
+
+    // If success → credit balance (only once)
+    if (status === "success" && paymentsCollection && usersCollection) {
+      const rec = await paymentsCollection.findOne({ payment_id });
+      if (rec && rec.status !== "success") {
+        await paymentsCollection.updateOne({ payment_id }, { $set: { status: "success", paidAt: new Date() } });
+        await usersCollection.updateOne(
+          { email: rec.email },
+          { $inc: { walletBalance: rec.amount }, $set: { updatedAt: new Date() } }
+        );
+      }
+    }
+
+    if (status === "failed" && paymentsCollection) {
+      await paymentsCollection.updateOne({ payment_id }, { $set: { status: "failed" } });
+    }
+
+    return res.json({ success: true, status, raw: zpData });
+  } catch (e) {
+    console.error("verify-payment error:", e.message);
+    return res.status(500).json({ success: false, message: "Verification failed.", error: e.message });
   }
 });
 
