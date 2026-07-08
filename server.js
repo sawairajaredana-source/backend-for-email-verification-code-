@@ -108,16 +108,6 @@ function checkOtpRate(email) {
 const otpStore      = {};
 const verifiedResets = {};
 
-const transporter = nodemailer.createTransport({
-  host:   "smtp-relay.brevo.com",
-  port:   587,
-  secure: false,
-  auth: {
-    user: decodeURIComponent(process.env.BREVO_USER || ""),
-    pass: process.env.BREVO_PASS,
-  },
-});
-
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -125,7 +115,31 @@ function generateOTP() {
 async function sendOTPEmail(email, otp, type) {
   const html    = type === "reset" ? getResetPasswordTemplate(otp) : getVerifyEmailTemplate(otp);
   const subject = type === "reset" ? "Reset your password" : "Verify your email";
-  await transporter.sendMail({ from: '"GETXH" <agency@getxh.in>', to: email, subject, html });
+
+  const brevoApiKey = process.env.BREVO_PASS || process.env.BREVO_API_KEY;
+  if (!brevoApiKey) {
+    throw new Error("BREVO_PASS or BREVO_API_KEY is not configured in env variables");
+  }
+
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "accept": "application/json",
+      "api-key": brevoApiKey,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      sender: { name: "GETXH", email: "agency@getxh.in" },
+      to: [{ email: email }],
+      subject: subject,
+      htmlContent: html
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Brevo HTTP API failed: ${response.status} - ${errText}`);
+  }
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
