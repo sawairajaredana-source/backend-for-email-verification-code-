@@ -82,6 +82,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const keyToLog = process.env.BREVO_PASS || process.env.BREVO_API_KEY || "";
+console.log("Brevo Config Check: keyLen =", keyToLog.length, "| prefix =", keyToLog.substring(0, 10));
+
 // ── Admin API key middleware ──────────────────────────────────────────────────
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || "gxadm_k9z2m7p4w1q8";
 
